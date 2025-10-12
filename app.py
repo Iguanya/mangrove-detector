@@ -1,15 +1,21 @@
 from flask import Flask, render_template, request, jsonify
 from inference_sdk import InferenceHTTPClient
+from dotenv import load_dotenv
 import os
 from datetime import datetime
+
+load_dotenv()  # Load variables from .env
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 
-# Roboflow inference client
+# Retrieve the API key securely
+api_key = os.getenv("ROBOFLOW_API_KEY")
+
+# Initialize Roboflow inference client
 client = InferenceHTTPClient(
     api_url="https://serverless.roboflow.com",
-    api_key="NTfoWVi9gAwdv1EHRxUM"
+    api_key=api_key
 )
 
 @app.route('/')
