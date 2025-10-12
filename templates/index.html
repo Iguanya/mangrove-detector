@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Home - MangroveID{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto text-center space-y-6">
+  <h1 class="text-4xl font-bold text-primary">Identify Mangroves & Coastal Plants</h1>
+  <p class="text-muted-foreground">
+    Upload an image or scan live using your device camera to identify mangroves and other coastal plants in real-time.
+  </p>
+
+  <div class="flex justify-center gap-4 mt-6">
+    <a href="#upload" class="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90">Upload Image</a>
+    <a href="{{ url_for('index') }}#camera" class="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg hover:opacity-90">Use Camera</a>
+  </div>
+
+  <!-- Upload Form -->
+  <div id="upload" class="mt-10 bg-card shadow-md rounded-lg p-6">
+    <form action="{{ url_for('detect') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
+      <input type="file" name="image" accept="image/*" required
+             class="block w-full text-sm border border-input rounded-lg p-2" />
+      <button type="submit" class="w-full py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90">
+        Detect Plant
+      </button>
+    </form>
+  </div>
+
+  <!-- Live Camera -->
+  <div id="camera" class="mt-10 bg-card shadow-md rounded-lg p-6">
+    <video id="video" autoplay playsinline class="mx-auto w-full max-w-md rounded-lg border border-border"></video>
+    <canvas id="canvas" class="hidden"></canvas>
+    <div class="flex justify-center mt-4">
+      <button id="captureBtn" class="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90">
+        Capture & Detect
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const captureBtn = document.getElementById('captureBtn');
+
+// Access camera
+if (navigator.mediaDevices && location.protocol === 'https:') {
+  navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream => video.srcObject = stream)
+    .catch(err => console.error("Camera access error:", err));
+} else {
+  console.warn("Camera only works over HTTPS or localhost");
+}
+
+captureBtn?.addEventListener('click', async () => {
+  const ctx = canvas.getContext('2d');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0);
+
+  const dataUrl = canvas.toDataURL('image/jpeg');
+  const blob = await (await fetch(dataUrl)).blob();
+  const formData = new FormData();
+  formData.append('image', blob, 'capture.jpg');
+
+  const response = await fetch('{{ url_for("detect") }}', { method: 'POST', body: formData });
+  window.location.href = response.url;
+});
+</script>
+{% endblock %}

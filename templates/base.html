@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en" id="html-root">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Mangrove Identifier{% endblock %}</title>
+
+    <!-- Load theme *before* CSS to prevent flicker -->
+    <script>
+      (function() {
+        const storedTheme = localStorage.getItem("theme");
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = storedTheme || (prefersDark ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
+
+    <!-- Your main stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  </head>
+
+  <body>
+    <!-- Navbar -->
+    <nav>
+      <div class="brand">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" />
+        <span>MangroveID</span>
+      </div>
+      <div class="right">
+        <a href="{{ url_for('index') }}">Home</a>
+        <a href="#about">About</a>
+        <button id="theme-toggle">Toggle Theme</button>
+      </div>
+    </nav>
+
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+      © {{ current_year or 2025 }} MangroveID Project — Empowering Coastal Conservation 🌊
+    </footer>
+
+    <!-- Load theme toggler script *after* page load -->
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+  </body>
+</html>

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Results - MangroveID{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-10 px-6 text-center transition-colors duration-300">
+
+  <!-- Page Title -->
+  <h2 class="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-8">
+    Detection Results
+  </h2>
+
+  <!-- Uploaded Image -->
+  <div class="flex justify-center mb-6">
+    <img 
+      src="{{ url_for('static', filename=image_path.split('static/')[-1]) }}"
+      alt="Uploaded Image"
+      class="rounded-xl shadow-md border border-gray-200 dark:border-gray-700 max-w-md w-full object-cover"
+    >
+  </div>
+
+  <!-- Prediction Details -->
+  {% set predictions = result[0].predictions.predictions if result and result[0].predictions and result[0].predictions.predictions else [] %}
+
+  {% if predictions and predictions|length > 0 %}
+    {% set main_pred = predictions[0] %}
+    <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 
+                rounded-xl shadow p-6 mb-6 text-center">
+      <h3 class="text-2xl font-semibold text-green-600 dark:text-green-400 mb-2">
+        🌿 {{ main_pred.class }}
+      </h3>
+      <p class="text-gray-700 dark:text-gray-300">
+        Confidence: {{ (main_pred.confidence * 100) | round(2) }}%
+      </p>
+    </div>
+  {% else %}
+    <p class="text-gray-600 dark:text-gray-400 mb-6">No predictions found.</p>
+  {% endif %}
+
+  <!-- Full JSON Output -->
+  <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 
+              rounded-xl shadow p-6 text-left overflow-auto max-h-[400px]">
+    <h4 class="text-lg font-medium mb-2 text-gray-800 dark:text-gray-100">Raw Response</h4>
+    <pre class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+{{ result | tojson(indent=2) }}
+    </pre>
+  </div>
+
+  <!-- Back to Home -->
+  <div class="mt-8">
+    <a href="{{ url_for('index') }}" 
+       class="inline-block px-6 py-2 bg-green-600 hover:bg-green-700 
+              text-white font-medium rounded-lg transition-all duration-200">
+      ← Back to Home
+    </a>
+  </div>
+
+</div>
+{% endblock %}
