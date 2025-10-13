@@ -74,6 +74,14 @@ def detect():
     # GET → render detect page
     return render_template('detect.html')
 
+@app.route("/log", methods=["POST"])
+def log_message():
+    data = request.json
+    level = data.get("level", "INFO")
+    message = data.get("message", "")
+    print(f"[{level}] {message}")  # this prints to your terminal
+    return jsonify({"status": "ok"})
+
 
 if __name__ == '__main__':
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)

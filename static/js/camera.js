@@ -158,6 +158,33 @@ function stopLiveDetection() {
   console.log("[INFO] Live detection stopped");
 }
 
+
+function log(msg, type="INFO") {
+  const timestamp = new Date().toLocaleTimeString();
+  const fullMsg = `[${timestamp}] [${type}] ${msg}`;
+
+  // On-screen overlay (optional)
+  const overlay = document.getElementById("log-overlay");
+  if (overlay) {
+    const line = document.createElement("div");
+    line.textContent = fullMsg;
+    line.style.color = type === "ERROR" ? "red" : type === "WARN" ? "yellow" : "lightgreen";
+    overlay.appendChild(line);
+    overlay.scrollTop = overlay.scrollHeight;
+  }
+
+  // Send to Flask terminal
+  fetch("/log", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ level: type, message: fullMsg })
+  }).catch(err => console.error("Failed to send log to server:", err));
+
+  // Also log to browser console
+  console.log(fullMsg);
+}
+
+
 // --- Event Listeners ---
 openCameraBtn?.addEventListener("click", openCamera);
 closeCameraBtn?.addEventListener("click", closeCamera);
