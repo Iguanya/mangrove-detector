@@ -2,9 +2,10 @@ from flask import Flask, render_template, request, jsonify
 from inference_sdk import InferenceHTTPClient
 from dotenv import load_dotenv
 import os
+import traceback
+import time
 from datetime import datetime
 from PIL import Image
-import io
 import pillow_heif  # For HEIC/HEIF support
 
 load_dotenv()  # Load variables from .env
@@ -27,6 +28,22 @@ ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "heic", "heif"}
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# --- Cleanup old uploads ---
+def cleanup_uploads(max_age_seconds=24*60*60):
+    now = time.time()
+    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+        return
+    for filename in os.listdir(app.config['UPLOAD_FOLDER']):
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        if os.path.isfile(filepath):
+            file_age = now - os.path.getmtime(filepath)
+            if file_age > max_age_seconds:
+                try:
+                    os.remove(filepath)
+                    print(f"[INFO] Deleted old file: {filepath}")
+                except Exception as e:
+                    print(f"[ERROR] Could not delete {filepath}: {e}")
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -34,44 +51,67 @@ def index():
 @app.route('/detect', methods=['GET', 'POST'])
 def detect():
     if request.method == 'POST':
-        if 'image' not in request.files:
-            return jsonify({"error": "No image uploaded"}), 400
+        try:
+            # --- Cleanup old images first ---
+            cleanup_uploads()
 
-        file = request.files['image']
-        if file.filename == '':
-            return jsonify({"error": "No selected file"}), 400
+            if 'image' not in request.files:
+                print("[ERROR] No image uploaded")
+                return jsonify({"error": "No image uploaded"}), 400
 
-        if not allowed_file(file.filename):
-            return jsonify({"error": "Unsupported file type"}), 400
+            file = request.files['image']
+            if file.filename == '':
+                print("[ERROR] No selected file")
+                return jsonify({"error": "No selected file"}), 400
 
-        # Ensure upload folder exists
-        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            if not allowed_file(file.filename):
+                print(f"[ERROR] Unsupported file type: {file.filename}")
+                return jsonify({"error": "Unsupported file type"}), 400
 
-        # Convert HEIC/HEIF to JPEG
-        ext = file.filename.rsplit(".", 1)[1].lower()
-        if ext in ("heic", "heif"):
-            heif_file = pillow_heif.read_heif(file.read())
-            image = Image.frombytes(heif_file.mode, heif_file.size, heif_file.data)
-        else:
-            image = Image.open(file.stream)
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-        # Save as JPEG
-        filename = datetime.now().strftime("%Y%m%d%H%M%S_") + "uploaded.jpg"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        image = image.convert("RGB")  # Ensure RGB mode for JPEG
-        image.save(filepath, format="JPEG", quality=95)
+            ext = file.filename.rsplit(".", 1)[1].lower()
+            if ext in ("heic", "heif"):
+                print(f"[INFO] Converting HEIC/HEIF to JPEG: {file.filename}")
+                heif_file = pillow_heif.read_heif(file.read())
+                image = Image.frombytes(heif_file.mode, heif_file.size, heif_file.data)
+            else:
+                image = Image.open(file.stream)
 
-        # Send to Roboflow
-        result = client.run_workflow(
-            workspace_name="mangrove-7pypu",
-            workflow_id="detect-count-and-visualize-2",
-            images={"image": filepath},
-            use_cache=True
-        )
+            # Save as JPEG
+            filename = datetime.now().strftime("%Y%m%d%H%M%S_") + "uploaded.jpg"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            image = image.convert("RGB")
+            image.save(filepath, format="JPEG", quality=95)
+            print(f"[INFO] Image saved to {filepath}")
 
-        return render_template('result.html', image_path=filepath, result=result)
+            # Send to Roboflow workflow
+            print("[INFO] Sending image to Roboflow workflow...")
+            result = client.run_workflow(
+                workspace_name="mangrove-7pypu",
+                workflow_id="detect-count-and-visualize-2",
+                images={"image": filepath},
+                use_cache=True
+            )
+            print(f"[INFO] Workflow result received: {result}")
 
-    # GET → render detect page
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({
+                    "success": True,
+                    "redirect_url": request.url,
+                    "result": result
+                })
+
+            return render_template('result.html', image_path=filepath, result=result)
+
+        except Exception as e:
+            print("[ERROR] Exception in /detect route:")
+            traceback.print_exc()
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"error": str(e)}), 500
+            else:
+                return render_template('error.html', error=str(e)), 500
+
     return render_template('detect.html')
 
 @app.route("/log", methods=["POST"])

@@ -1,4 +1,7 @@
 
+# Optional: keep the folder but ignore contents
+static/uploads/.keep
+
 .env
 /logs/*
 /configs/*
