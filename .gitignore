@@ -1,2 +1,4 @@
-static/uploads
+/static/uploads
 .env
+/logs
+/configs
