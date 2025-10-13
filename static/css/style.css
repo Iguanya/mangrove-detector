@@ -178,3 +178,18 @@ img {
   border-radius: 10px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
+
+/* Make uploaded images responsive */
+img.uploaded-image {
+  max-width: 100%;       /* Never exceed container width */
+  height: auto;          /* Keep aspect ratio */
+  display: block;        /* Remove inline spacing issues */
+  margin: 0 auto;        /* Center horizontally */
+  border-radius: 0.75rem; /* Rounded corners (matches Tailwind) */
+  object-fit: contain;   /* Keep image fully visible */
+}
+
+/* Optional: limit height on large images to prevent overflow */
+img.uploaded-image.limited-height {
+  max-height: 60vh;      /* Image won’t take more than 60% of viewport height */
+}
