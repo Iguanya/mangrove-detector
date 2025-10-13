@@ -22,33 +22,32 @@ client = InferenceHTTPClient(
 def index():
     return render_template('index.html')
 
-@app.route('/detect', methods=['POST'])
+@app.route('/detect', methods=['GET', 'POST'])
 def detect():
-    if 'image' not in request.files:
-        return jsonify({"error": "No image uploaded"}), 400
+    if request.method == 'POST':
+        if 'image' not in request.files:
+            return jsonify({"error": "No image uploaded"}), 400
 
-    file = request.files['image']
-    if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
+        file = request.files['image']
+        if file.filename == '':
+            return jsonify({"error": "No selected file"}), 400
 
-    # Save uploaded image
-    filename = datetime.now().strftime("%Y%m%d%H%M%S_") + file.filename
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(filepath)
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+        filename = datetime.now().strftime("%Y%m%d%H%M%S_") + file.filename
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
 
-    # Run Roboflow workflow
-    result = client.run_workflow(
-        workspace_name="mangrove-7pypu",
-        workflow_id="detect-count-and-visualize-2",
-        images={"image": filepath},
-        use_cache=True
-    )
+        result = client.run_workflow(
+            workspace_name="mangrove-7pypu",
+            workflow_id="detect-count-and-visualize-2",
+            images={"image": filepath},
+            use_cache=True
+        )
 
-    # If the request came from the camera (AJAX), return JSON
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return jsonify(result)
+        return render_template('result.html', image_path=filepath, result=result)
 
-    return render_template('result.html', image_path=filepath, result=result)
+    # GET → render detect page
+    return render_template('detect.html')
 
 if __name__ == '__main__':
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)

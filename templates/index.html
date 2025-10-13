@@ -1,67 +1,73 @@
 {% extends "base.html" %}
 {% block title %}Home - MangroveID{% endblock %}
+
 {% block content %}
-<div class="max-w-3xl mx-auto text-center space-y-6">
-  <h1 class="text-4xl font-bold text-primary">Identify Mangroves & Coastal Plants</h1>
-  <p class="text-muted-foreground">
-    Upload an image or scan live using your device camera to identify mangroves and other coastal plants in real-time.
-  </p>
+<div class="container">
 
-  <div class="flex justify-center gap-4 mt-6">
-    <a href="#upload" class="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90">Upload Image</a>
-    <a href="{{ url_for('index') }}#camera" class="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg hover:opacity-90">Use Camera</a>
-  </div>
-
-  <!-- Upload Form -->
-  <div id="upload" class="mt-10 bg-card shadow-md rounded-lg p-6">
-    <form action="{{ url_for('detect') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
-      <input type="file" name="image" accept="image/*" required
-             class="block w-full text-sm border border-input rounded-lg p-2" />
-      <button type="submit" class="w-full py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90">
-        Detect Plant
-      </button>
-    </form>
-  </div>
-
-  <!-- Live Camera -->
-  <div id="camera" class="mt-10 bg-card shadow-md rounded-lg p-6">
-    <video id="video" autoplay playsinline class="mx-auto w-full max-w-md rounded-lg border border-border"></video>
-    <canvas id="canvas" class="hidden"></canvas>
-    <div class="flex justify-center mt-4">
-      <button id="captureBtn" class="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90">
-        Capture & Detect
-      </button>
+  <!-- Hero / Introduction -->
+  <section class="hero-section">
+    <h1 class="hero-title">MangroveID</h1>
+    <p class="hero-subtitle">
+      Instantly identify mangroves and coastal plants! Upload a photo or use your device camera for real-time detection.
+    </p>
+    <div class="hero-buttons">
+      <a href="{{ url_for('detect') }}#upload" class="button button-primary">Upload Image</a>
+      <a href="{{ url_for('detect') }}#camera" class="button button-secondary">Use Camera</a>
     </div>
-  </div>
+  </section>
+
+  <!-- How It Works -->
+  <section class="how-it-works-section">
+    <div class="how-it-works-text">
+      <h2>How It Works</h2>
+      <ol>
+        <li>Upload a photo or capture it live with your camera.</li>
+        <li>AI model analyzes the image and identifies the plant species.</li>
+        <li>Receive detailed information with confidence scores.</li>
+        <li>Optionally, download results for research or documentation.</li>
+      </ol>
+    </div>
+    <div class="how-it-works-image">
+      <img src="{{ url_for('static', filename='images/how-it-works.png') }}" alt="How It Works Illustration">
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features-section">
+    <h2>Features</h2>
+    <div class="features-list">
+      <div class="feature-item"><span>📷</span> Upload images or scan plants live using your device camera.</div>
+      <div class="feature-item"><span>🤖</span> Accurate AI-powered plant detection with confidence scores.</div>
+      <div class="feature-item"><span>📱</span> Mobile-friendly, works directly in the browser (HTTPS required for camera).</div>
+      <div class="feature-item"><span>📊</span> View raw detection results for research and verification.</div>
+      <div class="feature-item"><span>⚡</span> Fast processing powered by Roboflow inference API.</div>
+    </div>
+  </section>
+
+  <!-- Benefits / Why Use -->
+  <section class="benefits-section">
+    <div class="benefits-image">
+      <img src="{{ url_for('static', filename='images/benefits.png') }}" alt="Benefits Illustration">
+    </div>
+    <div class="benefits-text">
+      <h2>Why Use MangroveID?</h2>
+      <p>MangroveID helps researchers, students, and coastal enthusiasts quickly identify mangroves and other coastal plants. It saves time, improves data accuracy, and supports environmental awareness.</p>
+      <ul>
+        <li>Instant plant recognition</li>
+        <li>Data collection for research & conservation</li>
+        <li>Supports environmental education and awareness</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Quick Start / Call to Action -->
+  <section class="cta-section">
+    <h2>Get Started</h2>
+    <div class="cta-buttons">
+      <a href="{{ url_for('detect') }}#upload" class="button button-primary">Upload an Image</a>
+      <a href="{{ url_for('detect') }}#camera" class="button button-secondary">Use Live Camera</a>
+    </div>
+  </section>
+
 </div>
-
-<script>
-const video = document.getElementById('video');
-const canvas = document.getElementById('canvas');
-const captureBtn = document.getElementById('captureBtn');
-
-// Access camera
-if (navigator.mediaDevices && location.protocol === 'https:') {
-  navigator.mediaDevices.getUserMedia({ video: true })
-    .then(stream => video.srcObject = stream)
-    .catch(err => console.error("Camera access error:", err));
-} else {
-  console.warn("Camera only works over HTTPS or localhost");
-}
-
-captureBtn?.addEventListener('click', async () => {
-  const ctx = canvas.getContext('2d');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  ctx.drawImage(video, 0, 0);
-
-  const dataUrl = canvas.toDataURL('image/jpeg');
-  const blob = await (await fetch(dataUrl)).blob();
-  const formData = new FormData();
-  formData.append('image', blob, 'capture.jpg');
-
-  const response = await fetch('{{ url_for("detect") }}', { method: 'POST', body: formData });
-  window.location.href = response.url;
-});
-</script>
 {% endblock %}

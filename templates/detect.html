@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Detect - MangroveID{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto text-center space-y-6">
+
+  <!-- Upload Form -->
+  <div id="upload" class="mt-10 bg-card shadow-md rounded-lg p-6">
+    <form action="{{ url_for('detect') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
+      <input type="file" name="image" accept="image/*" required
+             class="block w-full text-sm border border-input rounded-lg p-2" />
+      <button type="submit" class="w-full py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90">
+        Detect Plant
+      </button>
+    </form>
+  </div>
+
+  <!-- Live Camera -->
+  <div id="camera" class="mt-10 bg-card shadow-md rounded-lg p-6">
+    <video id="video" autoplay playsinline class="mx-auto w-full max-w-md rounded-lg border border-border"></video>
+    <canvas id="canvas" class="hidden"></canvas>
+    <div class="flex justify-center mt-4">
+      <button id="captureBtn" class="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90">
+        Capture & Detect
+      </button>
+    </div>
+  </div>
+
+</div>
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+{% endblock %}
+
+{% endblock %}
