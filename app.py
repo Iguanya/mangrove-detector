@@ -6,29 +6,60 @@ import traceback
 import time
 from datetime import datetime
 from PIL import Image
-import pillow_heif  # For HEIC/HEIF support
+import pillow_heif
+import paramiko
 
-load_dotenv()  # Load variables from .env
+load_dotenv()
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 MB max upload
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 
-# Retrieve the API key securely
 api_key = os.getenv("ROBOFLOW_API_KEY")
 
-# Initialize Roboflow inference client
 client = InferenceHTTPClient(
     api_url="https://serverless.roboflow.com",
     api_key=api_key
 )
+
+SFTP_HOST = os.getenv("SFTP_HOST")
+SFTP_PORT = int(os.getenv("SFTP_PORT", 22))
+SFTP_USERNAME = os.getenv("SFTP_USERNAME")
+SFTP_PASSWORD = os.getenv("SFTP_PASSWORD")
+SFTP_REMOTE_PATH = os.getenv("SFTP_REMOTE_PATH", "/uploads")
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "heic", "heif"}
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# --- Cleanup old uploads ---
+def upload_to_sftp(local_filepath, remote_filename):
+    if not all([SFTP_HOST, SFTP_USERNAME, SFTP_PASSWORD]):
+        print("[WARN] SFTP credentials not configured, skipping remote upload")
+        return False
+    
+    try:
+        transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
+        transport.connect(username=SFTP_USERNAME, password=SFTP_PASSWORD)
+        sftp = paramiko.SFTPClient.from_transport(transport)
+        
+        try:
+            sftp.stat(SFTP_REMOTE_PATH)
+        except FileNotFoundError:
+            sftp.mkdir(SFTP_REMOTE_PATH)
+        
+        remote_filepath = f"{SFTP_REMOTE_PATH}/{remote_filename}"
+        sftp.put(local_filepath, remote_filepath)
+        print(f"[INFO] File uploaded to SFTP: {remote_filepath}")
+        
+        sftp.close()
+        transport.close()
+        return True
+    except Exception as e:
+        print(f"[ERROR] SFTP upload failed: {e}")
+        traceback.print_exc()
+        return False
+
 def cleanup_uploads(max_age_seconds=24*60*60):
     now = time.time()
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -52,7 +83,6 @@ def index():
 def detect():
     if request.method == 'POST':
         try:
-            # --- Cleanup old images first ---
             cleanup_uploads()
 
             if 'image' not in request.files:
@@ -78,14 +108,14 @@ def detect():
             else:
                 image = Image.open(file.stream)
 
-            # Save as JPEG
             filename = datetime.now().strftime("%Y%m%d%H%M%S_") + "uploaded.jpg"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             image = image.convert("RGB")
             image.save(filepath, format="JPEG", quality=95)
-            print(f"[INFO] Image saved to {filepath}")
+            print(f"[INFO] Image saved locally to {filepath}")
 
-            # Send to Roboflow workflow
+            upload_to_sftp(filepath, filename)
+
             print("[INFO] Sending image to Roboflow workflow...")
             result = client.run_workflow(
                 workspace_name="mangrove-7pypu",
@@ -119,7 +149,7 @@ def log_message():
     data = request.json
     level = data.get("level", "INFO")
     message = data.get("message", "")
-    print(f"[{level}] {message}")  # this prints to your terminal
+    print(f"[{level}] {message}")
     return jsonify({"status": "ok"})
 
 
