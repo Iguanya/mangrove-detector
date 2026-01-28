@@ -23,9 +23,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsContent = document.getElementById('results-content');
   const statusMessage = document.getElementById('status-message');
 
+  const switchCameraBtn = document.getElementById('switch-camera');
+
   let stream = null;
   let liveInterval = null;
   let selectedFile = null;
+  let currentFacingMode = 'environment'; // Start with back camera
+  let hasMultipleCameras = false;
 
   tabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -140,20 +144,30 @@ document.addEventListener('DOMContentLoaded', () => {
     detectBtn.disabled = false;
   }
 
-  async function startCamera() {
+  async function startCamera(facingMode = 'environment') {
     try {
       showStatus('Starting camera...', 'info');
       
+      // Stop existing stream if any
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(d => d.kind === 'videoinput');
+      hasMultipleCameras = videoDevices.length > 1;
       
-      let constraints = { video: { width: { ideal: 1280 }, height: { ideal: 720 } } };
-      if (videoDevices.length > 1) {
-        constraints.video.facingMode = { ideal: 'environment' };
-      }
+      let constraints = { 
+        video: { 
+          width: { ideal: 1280 }, 
+          height: { ideal: 720 },
+          facingMode: { ideal: facingMode }
+        } 
+      };
 
       stream = await navigator.mediaDevices.getUserMedia(constraints);
       video.srcObject = stream;
+      currentFacingMode = facingMode;
       
       cameraPlaceholder.classList.add('hidden');
       video.classList.remove('hidden');
@@ -162,17 +176,47 @@ document.addEventListener('DOMContentLoaded', () => {
       captureBtn.classList.remove('hidden');
       liveScanBtn.classList.remove('hidden');
       
+      // Show switch button only if multiple cameras available
+      if (hasMultipleCameras) {
+        switchCameraBtn.classList.remove('hidden');
+      } else {
+        switchCameraBtn.classList.add('hidden');
+      }
+      
       hideStatus();
-      showStatus('Camera ready', 'success');
+      const cameraType = facingMode === 'environment' ? 'Back' : 'Front';
+      showStatus(`${cameraType} camera ready`, 'success');
       setTimeout(hideStatus, 2000);
     } catch (err) {
       console.error('Camera error:', err);
       if (err.name === 'NotAllowedError') {
         showStatus('Camera access denied. Please allow camera permissions.', 'error');
+      } else if (err.name === 'OverconstrainedError') {
+        // If the requested camera isn't available, try without facingMode constraint
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          video.srcObject = stream;
+          cameraPlaceholder.classList.add('hidden');
+          video.classList.remove('hidden');
+          startCameraBtn.classList.add('hidden');
+          stopCameraBtn.classList.remove('hidden');
+          captureBtn.classList.remove('hidden');
+          liveScanBtn.classList.remove('hidden');
+          showStatus('Camera ready', 'success');
+          setTimeout(hideStatus, 2000);
+        } catch (fallbackErr) {
+          showStatus('Could not access camera. Make sure you\'re using HTTPS.', 'error');
+        }
       } else {
         showStatus('Could not access camera. Make sure you\'re using HTTPS.', 'error');
       }
     }
+  }
+
+  async function switchCamera() {
+    const newFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+    showStatus('Switching camera...', 'info');
+    await startCamera(newFacingMode);
   }
 
   function stopCamera() {
@@ -187,11 +231,13 @@ document.addEventListener('DOMContentLoaded', () => {
     cameraOverlay.classList.add('hidden');
     startCameraBtn.classList.remove('hidden');
     stopCameraBtn.classList.add('hidden');
+    switchCameraBtn.classList.add('hidden');
     captureBtn.classList.add('hidden');
     liveScanBtn.classList.add('hidden');
     stopScanBtn.classList.add('hidden');
     liveResults.classList.add('hidden');
     resetCaptureBtn();
+    currentFacingMode = 'environment'; // Reset to back camera for next time
   }
 
   async function captureAndDetect() {
@@ -374,8 +420,9 @@ document.addEventListener('DOMContentLoaded', () => {
     statusMessage.classList.add('hidden');
   }
 
-  startCameraBtn.addEventListener('click', startCamera);
+  startCameraBtn.addEventListener('click', () => startCamera('environment'));
   stopCameraBtn.addEventListener('click', stopCamera);
+  switchCameraBtn.addEventListener('click', switchCamera);
   captureBtn.addEventListener('click', captureAndDetect);
   liveScanBtn.addEventListener('click', startLiveScan);
   stopScanBtn.addEventListener('click', stopLiveScan);

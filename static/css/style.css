@@ -807,6 +807,11 @@ a.back-button:hover {
   color: white;
 }
 
+.control-btn.switch {
+  background: #6366f1;
+  color: white;
+}
+
 .control-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
