@@ -45,28 +45,93 @@ body {
    Navbar
 ================================= */
 nav {
-  background-color: var(--color-sidebar);
-  color: var(--color-sidebar-foreground);
+  background-color: var(--color-card);
+  color: var(--color-foreground);
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 1rem 2rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
   position: sticky;
   top: 0;
   z-index: 50;
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--color-border);
+}
+
+nav .brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: var(--color-primary);
+}
+
+nav .brand img {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+nav .nav-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 nav a {
-  color: var(--color-sidebar-foreground);
+  color: var(--color-foreground);
   text-decoration: none;
   font-weight: 500;
-  margin-left: 1rem;
-  transition: color 0.3s ease;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
 }
 
-nav a:hover { color: var(--color-primary); }
-nav .brand { display: flex; align-items: center; gap: 0.75rem; }
+nav a:hover {
+  color: var(--color-primary);
+  background: var(--color-muted);
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: var(--color-muted);
+  color: var(--color-foreground);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-left: 0.5rem;
+}
+
+.theme-toggle:hover {
+  background: var(--color-primary);
+  color: white;
+  transform: rotate(15deg);
+}
+
+.theme-toggle .sun-icon {
+  display: block;
+}
+
+.theme-toggle .moon-icon {
+  display: none;
+}
+
+[data-theme="dark"] .theme-toggle .sun-icon {
+  display: none;
+}
+
+[data-theme="dark"] .theme-toggle .moon-icon {
+  display: block;
+}
 
 
 /* ===============================
@@ -880,6 +945,47 @@ a.back-button:hover {
   
   .camera-controls {
     gap: 0.5rem;
+  }
+}
+
+/* ===============================
+   Footer
+================================= */
+footer {
+  text-align: center;
+  padding: 2rem;
+  background: var(--color-card);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-foreground);
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+
+/* ===============================
+   Responsive Navbar
+================================= */
+@media (max-width: 640px) {
+  nav {
+    padding: 0.75rem 1rem;
+  }
+  
+  nav .brand span {
+    font-size: 1rem;
+  }
+  
+  nav .brand img {
+    width: 32px;
+    height: 32px;
+  }
+  
+  nav a {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.9rem;
+  }
+  
+  .theme-toggle {
+    width: 38px;
+    height: 38px;
   }
 }
 
