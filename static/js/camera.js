@@ -1,193 +1,382 @@
-const openCameraBtn = document.getElementById("open-camera");
-const closeCameraBtn = document.getElementById("close-camera");
-const captureBtn = document.getElementById("captureBtn");
-const startLiveBtn = document.getElementById("startLiveBtn");
-const stopLiveBtn = document.getElementById("stopLiveBtn");
+document.addEventListener('DOMContentLoaded', () => {
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const imagePreview = document.getElementById('image-preview');
+  const previewImg = document.getElementById('preview-img');
+  const removeImageBtn = document.getElementById('remove-image');
+  const detectBtn = document.getElementById('detect-btn');
+  const hiddenForm = document.getElementById('hidden-form');
+  const hiddenFileInput = document.getElementById('hidden-file-input');
+  
+  const startCameraBtn = document.getElementById('start-camera');
+  const stopCameraBtn = document.getElementById('stop-camera');
+  const captureBtn = document.getElementById('capture-btn');
+  const liveScanBtn = document.getElementById('live-scan-btn');
+  const stopScanBtn = document.getElementById('stop-scan-btn');
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const cameraPlaceholder = document.getElementById('camera-placeholder');
+  const cameraOverlay = document.getElementById('camera-overlay');
+  const liveResults = document.getElementById('live-results');
+  const resultsContent = document.getElementById('results-content');
+  const statusMessage = document.getElementById('status-message');
 
-const cameraContainer = document.getElementById("camera");
-const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const liveResult = document.getElementById("live-result");
+  let stream = null;
+  let liveInterval = null;
+  let selectedFile = null;
 
-let stream;
-let liveStreamInterval;
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      tabBtns.forEach(b => b.classList.remove('active'));
+      tabContents.forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(tab).classList.add('active');
+    });
+  });
 
-// --- Open Camera ---
-async function openCamera() {
-  console.log("[INFO] Open Camera button clicked");
-  cameraContainer.classList.remove("hidden");
+  dropZone.addEventListener('click', () => fileInput.click());
+  
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+  });
 
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    console.log("[INFO] Available devices:", devices);
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('dragover');
+  });
 
-    const videoDevices = devices.filter(d => d.kind === "videoinput");
-    console.log(`[INFO] Found ${videoDevices.length} video devices`);
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) handleFileSelect(files[0]);
+  });
 
-    let constraints = { video: true };
-    if (videoDevices.length > 1) {
-      constraints = { video: { facingMode: { exact: "environment" } } };
-      console.log("[INFO] Trying to use back camera");
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) handleFileSelect(e.target.files[0]);
+  });
+
+  function handleFileSelect(file) {
+    if (!file.type.startsWith('image/')) {
+      showStatus('Please select an image file', 'error');
+      return;
     }
+    selectedFile = file;
+    
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    hiddenFileInput.files = dataTransfer.files;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      previewImg.src = e.target.result;
+      dropZone.classList.add('hidden');
+      imagePreview.classList.remove('hidden');
+      detectBtn.classList.remove('disabled');
+      detectBtn.disabled = false;
+    };
+    reader.readAsDataURL(file);
+  }
 
-    stream = await navigator.mediaDevices.getUserMedia(constraints);
-    video.srcObject = stream;
-    console.log("[SUCCESS] Camera opened");
-  } catch (err) {
-    console.warn("[WARN] Back camera not available, trying default camera.", err);
+  removeImageBtn.addEventListener('click', () => {
+    selectedFile = null;
+    previewImg.src = '';
+    fileInput.value = '';
+    hiddenFileInput.value = '';
+    imagePreview.classList.add('hidden');
+    dropZone.classList.remove('hidden');
+    detectBtn.classList.add('disabled');
+    detectBtn.disabled = true;
+  });
+
+  detectBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    
+    const btnText = detectBtn.querySelector('.btn-text');
+    const btnLoader = detectBtn.querySelector('.btn-loader');
+    btnText.classList.add('hidden');
+    btnLoader.classList.remove('hidden');
+    detectBtn.disabled = true;
+
+    const formData = new FormData();
+    formData.append('image', selectedFile);
+
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const response = await fetch('/detect', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.redirect_url) {
+          window.location.href = result.redirect_url;
+        } else if (result.success) {
+          window.location.reload();
+        } else {
+          showStatus('Detection completed', 'success');
+          resetDetectBtn();
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        showStatus(errorData.error || 'Detection failed. Please try again.', 'error');
+        resetDetectBtn();
+      }
+    } catch (err) {
+      console.error('Detection error:', err);
+      hiddenForm.submit();
+    }
+  });
+
+  function resetDetectBtn() {
+    const btnText = detectBtn.querySelector('.btn-text');
+    const btnLoader = detectBtn.querySelector('.btn-loader');
+    btnText.classList.remove('hidden');
+    btnLoader.classList.add('hidden');
+    detectBtn.disabled = false;
+  }
+
+  async function startCamera() {
+    try {
+      showStatus('Starting camera...', 'info');
+      
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(d => d.kind === 'videoinput');
+      
+      let constraints = { video: { width: { ideal: 1280 }, height: { ideal: 720 } } };
+      if (videoDevices.length > 1) {
+        constraints.video.facingMode = { ideal: 'environment' };
+      }
+
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
       video.srcObject = stream;
-      console.log("[SUCCESS] Default camera opened");
-    } catch (error) {
-      console.error("[ERROR] Camera access denied or unavailable:", error);
-      alert("Camera access denied or unavailable. Ensure HTTPS and allow camera permissions.");
+      
+      cameraPlaceholder.classList.add('hidden');
+      video.classList.remove('hidden');
+      startCameraBtn.classList.add('hidden');
+      stopCameraBtn.classList.remove('hidden');
+      captureBtn.classList.remove('hidden');
+      liveScanBtn.classList.remove('hidden');
+      
+      hideStatus();
+      showStatus('Camera ready', 'success');
+      setTimeout(hideStatus, 2000);
+    } catch (err) {
+      console.error('Camera error:', err);
+      if (err.name === 'NotAllowedError') {
+        showStatus('Camera access denied. Please allow camera permissions.', 'error');
+      } else {
+        showStatus('Could not access camera. Make sure you\'re using HTTPS.', 'error');
+      }
     }
   }
-}
 
-// --- Close Camera ---
-function closeCamera() {
-  console.log("[INFO] Close Camera button clicked");
-  stopLiveDetection();
-  stream?.getTracks().forEach(track => track.stop());
-  cameraContainer.classList.add("hidden");
-  console.log("[INFO] Camera closed");
-}
+  function stopCamera() {
+    stopLiveScan();
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
+    video.srcObject = null;
+    video.classList.add('hidden');
+    cameraPlaceholder.classList.remove('hidden');
+    cameraOverlay.classList.add('hidden');
+    startCameraBtn.classList.remove('hidden');
+    stopCameraBtn.classList.add('hidden');
+    captureBtn.classList.add('hidden');
+    liveScanBtn.classList.add('hidden');
+    stopScanBtn.classList.add('hidden');
+    liveResults.classList.add('hidden');
+    resetCaptureBtn();
+  }
 
-// --- Capture & Detect ---
-async function captureAndDetect() {
-  console.log("[INFO] Capture & Detect button clicked");
+  async function captureAndDetect() {
+    if (!stream) return;
+    
+    captureBtn.disabled = true;
+    captureBtn.innerHTML = `
+      <svg class="spinner" width="24" height="24" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="31.4" stroke-linecap="round"/>
+      </svg>
+      Processing...
+    `;
 
-  try {
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0);
 
     canvas.toBlob(async (blob) => {
       if (!blob) {
-        console.error("[ERROR] Failed to get blob from canvas");
+        showStatus('Failed to capture image', 'error');
+        resetCaptureBtn();
         return;
       }
 
       const formData = new FormData();
-      formData.append("image", blob, "capture.jpg");
+      formData.append('image', blob, 'capture.jpg');
 
       try {
-        const response = await fetch("/detect", {
-          method: "POST",
+        const response = await fetch('/detect', {
+          method: 'POST',
           body: formData,
-          headers: { "X-Requested-With": "XMLHttpRequest" }
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
         });
 
         if (response.ok) {
           const result = await response.json();
-          console.log("[SUCCESS] Capture sent, received result:", result);
-
           if (result.redirect_url) {
             window.location.href = result.redirect_url;
-          } else {
+          } else if (result.success) {
             window.location.reload();
+          } else {
+            showStatus('Capture completed', 'success');
+            resetCaptureBtn();
           }
         } else {
-          console.error("[ERROR] Capture failed, server returned:", response.status);
-          alert("Failed to detect plant. Try again.");
+          const errorData = await response.json().catch(() => ({}));
+          showStatus(errorData.error || 'Detection failed', 'error');
+          resetCaptureBtn();
         }
       } catch (err) {
-        console.error("[ERROR] Failed to send captured image:", err);
-        alert("Error sending captured image. Check console.");
+        console.error('Capture error:', err);
+        showStatus('Error processing image. Please try again.', 'error');
+        resetCaptureBtn();
       }
-    }, "image/jpeg");
-  } catch (err) {
-    console.error("[ERROR] Capture & Detect failed:", err);
-  }
-}
-
-// --- Live Detection ---
-function startLiveDetection() {
-  console.log("[INFO] Start Live Scan button clicked");
-
-  if (!stream) {
-    alert("Camera not active");
-    console.warn("[WARN] Cannot start live scan, camera not active");
-    return;
+    }, 'image/jpeg', 0.9);
   }
 
-  liveStreamInterval = setInterval(async () => {
-    try {
+  function resetCaptureBtn() {
+    captureBtn.disabled = false;
+    captureBtn.innerHTML = `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <circle cx="12" cy="12" r="6" fill="currentColor"/>
+      </svg>
+      Capture
+    `;
+  }
+
+  function startLiveScan() {
+    if (!stream) return;
+    
+    liveScanBtn.classList.add('hidden');
+    stopScanBtn.classList.remove('hidden');
+    cameraOverlay.classList.remove('hidden');
+    liveResults.classList.remove('hidden');
+    resultsContent.innerHTML = '<p class="scanning">Scanning...</p>';
+
+    liveInterval = setInterval(async () => {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0);
 
       canvas.toBlob(async (blob) => {
-        if (!blob) {
-          console.error("[ERROR] Failed to get blob for live detection");
-          return;
-        }
+        if (!blob) return;
 
         const formData = new FormData();
-        formData.append("image", blob, "live_frame.jpg");
+        formData.append('image', blob, 'live_frame.jpg');
 
         try {
-          const response = await fetch("/detect", {
-            method: "POST",
+          const response = await fetch('/detect', {
+            method: 'POST',
             body: formData,
-            headers: { "X-Requested-With": "XMLHttpRequest" }
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
           });
 
           if (response.ok) {
             const result = await response.json();
-            liveResult.innerText = JSON.stringify(result, null, 2);
-            console.log("[INFO] Live detection frame processed");
+            displayLiveResults(result);
+          } else {
+            const errorData = await response.json().catch(() => ({}));
+            resultsContent.innerHTML = `<p class="error-msg">${errorData.error || 'Detection error'}</p>`;
           }
         } catch (err) {
-          console.error("[ERROR] Live detection request failed:", err);
+          console.error('Live scan error:', err);
+          resultsContent.innerHTML = '<p class="error-msg">Connection error</p>';
         }
-      }, "image/jpeg");
-    } catch (err) {
-      console.error("[ERROR] Live detection loop failed:", err);
-    }
-  }, 1000); // send every 1 second
-}
-
-function stopLiveDetection() {
-  console.log("[INFO] Stop Live Scan button clicked");
-  clearInterval(liveStreamInterval);
-  console.log("[INFO] Live detection stopped");
-}
-
-
-function log(msg, type="INFO") {
-  const timestamp = new Date().toLocaleTimeString();
-  const fullMsg = `[${timestamp}] [${type}] ${msg}`;
-
-  // On-screen overlay (optional)
-  const overlay = document.getElementById("log-overlay");
-  if (overlay) {
-    const line = document.createElement("div");
-    line.textContent = fullMsg;
-    line.style.color = type === "ERROR" ? "red" : type === "WARN" ? "yellow" : "lightgreen";
-    overlay.appendChild(line);
-    overlay.scrollTop = overlay.scrollHeight;
+      }, 'image/jpeg', 0.8);
+    }, 1500);
   }
 
-  // Send to Flask terminal
-  fetch("/log", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ level: type, message: fullMsg })
-  }).catch(err => console.error("Failed to send log to server:", err));
+  function stopLiveScan() {
+    if (liveInterval) {
+      clearInterval(liveInterval);
+      liveInterval = null;
+    }
+    stopScanBtn.classList.add('hidden');
+    liveScanBtn.classList.remove('hidden');
+    cameraOverlay.classList.add('hidden');
+  }
 
-  // Also log to browser console
-  console.log(fullMsg);
-}
+  function displayLiveResults(data) {
+    if (!data) {
+      resultsContent.innerHTML = '<p class="no-results">No response received</p>';
+      return;
+    }
 
+    if (data.error) {
+      resultsContent.innerHTML = `<p class="error-msg">${data.error}</p>`;
+      return;
+    }
 
-// --- Event Listeners ---
-openCameraBtn?.addEventListener("click", openCamera);
-closeCameraBtn?.addEventListener("click", closeCamera);
-captureBtn?.addEventListener("click", captureAndDetect);
-startLiveBtn?.addEventListener("click", startLiveDetection);
-stopLiveBtn?.addEventListener("click", stopLiveDetection);
+    let predictions = [];
+    
+    if (data.result && Array.isArray(data.result) && data.result.length > 0) {
+      const result = data.result[0];
+      if (result.predictions) {
+        if (Array.isArray(result.predictions)) {
+          predictions = result.predictions;
+        } else if (result.predictions.predictions && Array.isArray(result.predictions.predictions)) {
+          predictions = result.predictions.predictions;
+        }
+      }
+      if (result.output && Array.isArray(result.output)) {
+        predictions = result.output;
+      }
+    }
+
+    if (predictions.length === 0) {
+      resultsContent.innerHTML = '<p class="no-results">No plants detected in frame</p>';
+      return;
+    }
+
+    let html = '';
+    predictions.slice(0, 5).forEach(pred => {
+      const className = pred.class || pred.label || pred.name || 'Unknown';
+      const confidence = Math.round((pred.confidence || pred.score || 0) * 100);
+      html += `
+        <div class="result-item">
+          <span class="result-name">${className}</span>
+          <div class="confidence-bar">
+            <div class="confidence-fill" style="width: ${confidence}%"></div>
+          </div>
+          <span class="confidence-value">${confidence}%</span>
+        </div>
+      `;
+    });
+
+    resultsContent.innerHTML = html;
+  }
+
+  function showStatus(message, type = 'info') {
+    statusMessage.textContent = message;
+    statusMessage.className = `status-message ${type}`;
+    statusMessage.classList.remove('hidden');
+  }
+
+  function hideStatus() {
+    statusMessage.classList.add('hidden');
+  }
+
+  startCameraBtn.addEventListener('click', startCamera);
+  stopCameraBtn.addEventListener('click', stopCamera);
+  captureBtn.addEventListener('click', captureAndDetect);
+  liveScanBtn.addEventListener('click', startLiveScan);
+  stopScanBtn.addEventListener('click', stopLiveScan);
+});

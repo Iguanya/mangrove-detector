@@ -36,6 +36,15 @@ Python packages are listed in `requirements.txt`:
 - pillow-heif
 
 ## Recent Changes
+- January 28, 2026: UI and Camera Improvements
+  - Redesigned detect page with modern tabbed interface
+  - Added drag & drop image upload with preview
+  - Improved camera controls with better state management
+  - Added loading spinners and status messages
+  - Live scan feature with real-time results display
+  - Smooth animations and transitions
+  - Mobile-responsive design
+  
 - January 26, 2026: Initial Replit environment setup
   - Configured Flask to run on port 5000
   - Installed all Python dependencies
